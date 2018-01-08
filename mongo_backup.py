@@ -20,7 +20,7 @@ LOG_CONFIG_DICT = {
             'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
         },
         'verbose': {
-            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+            'format': '%(asctime)s [%(levelname)s] %(module)s %(process)d %(thread)d %(message)s'
         },
     },
     'handlers': {
@@ -41,11 +41,6 @@ LOG_CONFIG_DICT = {
             'handlers': ['stream_h', 'file_h'],
             'level': 'NOTSET',
             'propagate': True
-        },
-        'requests.packages': {
-            'handlers': ['stream_h'],
-            'level': 'NOTSET',
-            'propagate': False
         },
     }
 }
@@ -87,11 +82,12 @@ class ExecCmdOnServer(GetSSHClient):
         finally:
             EMAIL_SUBJECT = \
                 "Lenote Had Backup %s at %s " % ('Failed' if e else 'Successful',
-                                                             datetime.datetime.now().strftime(DATETIME_FMT))
+                                                 datetime.datetime.now().strftime(DATETIME_FMT))
             EMAIL_MESSAGE_SU = \
                 'Congratulations backup Leanote mongoDB successful'
             ReportBackupStatus(EMAIL_ADDR, EMAIL_SUBJECT,
                                e if e else EMAIL_MESSAGE_SU)
+
 
 class DownloadBackFile(GetSSHClient):
     def __init__(self):
@@ -138,7 +134,7 @@ def main():
     parser.add_argument('-u', '--username', default='root', help="username for Leanote  server")
     parser.add_argument('-p', '--password', required=True, help="passwd for Leanote  server")
     parser.add_argument('-d', '--dest', default='/backup/mongo_backup')
-    #TODO(ZHANGCHAO): add mongoDB argument
+    # TODO(ZHANGCHAO): add mongoDB argument
 
     config = parser.parse_args(sys.argv[1:])
     if config.debug:
