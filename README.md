@@ -1,5 +1,4 @@
 # BackupMongoDB
-<<<<<<< HEAD
 =======
 this tool contain four part as following:
 
@@ -11,4 +10,3 @@ this tool contain four part as following:
 
 ## 4. report above action status through Email
 
->>>>>>> 03535effc4e559fa6579a2c00af084b6acaab2f4
