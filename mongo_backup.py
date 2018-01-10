@@ -7,12 +7,12 @@ import sys, os
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import formataddr
-import shutil
 
 EMAIL_ADDR = ['neteric@126.com', 'tc_pilgrim@163.com']
 DATETIME_FMT = '%Y/%m/%d %H:%M'
-DATETIME_FMT2 = '%Y%m%d%H%M'
+TIME_FMT = '%Y%m%d%H%M'
 NOW_TIME = datetime.datetime.now().strftime(DATETIME_FMT)
+NOW = datetime.datetime.now().strftime(TIME_FMT)
 E_SUBJECT_F = "Leanote Had Backup Failed at %s " % (NOW_TIME)
 E_SUBJECT_S = "Leanote Had Backup Successful at %s " % (NOW_TIME)
 E_MESSAGE_S = "Congratulations! you had backup database data successful!"
@@ -22,9 +22,6 @@ LOG_CONFIG_DICT = {
     'formatters': {
         'standard': {
             'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-        },
-        'verbose': {
-            'format': '%(asctime)s [%(levelname)s] %(module)s %(process)d %(thread)d %(message)s'
         },
     },
     'handlers': {
@@ -51,6 +48,8 @@ LOG_CONFIG_DICT = {
 Logger = logging.getLogger('LeMongoDump')
 
 
+
+
 class GetSSHClient(object):
     def __init__(self, conf):
         self.conf = conf
@@ -71,56 +70,59 @@ class GetSSHClient(object):
 
         else:
             Logger.info("Get ssh connection successful!")
-            ExecCmdOnServer(self.conf, self.ssh)
+            return self.ssh
 
 
 class ExecCmdOnServer(GetSSHClient):
     def __init__(self, conf, ssh):
         self.conf = conf
         self.ssh = ssh
-        self.cmd_mkdir = "/usr/bin/mkdir -p %s" % self.conf.dest
-        self.cmd_ls = "/usr/bin/ls %s" % self.conf.dest
         self.conf.dest = os.path.abspath(self.conf.dest)
-        self.backup_file_name = "%s/mongo_backup_%s.tar.gz" % (
-        self.conf.dest, datetime.datetime.now().strftime(DATETIME_FMT2),)
-        self.cmd_tar = 'tar -zcvf %s %s' % (self.backup_file_name, self.conf.dest)
-        # TODO(ZHANGCHAO): there has a bug, mo
-        self.cmd = "{0} {1} {2} {3} {4}".format('/opt/mongodb-linux-x86_64-3.0.1/bin/mongodump',
+        self.cmd_mkdir = "/usr/bin/mkdir -p %s" % os.path.join(self.conf.dest, NOW)
+        self.DEST = os.path.join(self.conf.dest, NOW)
+        self.backup_file = "%s/mongo_backup_%s.tar.gz" % (self.conf.dest, NOW)
+        self.cmd_tar = 'tar -zcvf %s %s' % (self.backup_file, self.DEST)
+        self.cmd_backup = "{0} {1} {2} {3} {4}".format('/opt/mongodb-linux-x86_64-3.0.1/bin/mongodump',
                                                 '-u %s' % self.conf.mongo_uname,
                                                 '-p %s' % self.conf.mongo_passwd,
                                                 '-d %s' % self.conf.mongo_dbname,
-                                                '-o %s' % self.conf.dest
+                                                '-o %s' % self.DEST
                                                 )
-        self.SureDirExits()
 
-    def SureDirExits(self):
-        stdin, stdout, stderr = self.ssh.exec_command(self.cmd_ls)
-        if 'No such file or directory' in stderr.readlines():
-            stdin, stdout, stderr = self.ssh.exec_command(self.cmd_mkdir)
+    def run(self, cmds):
+        Logger.info("Runing cmd: %s" % cmds)
+        stdin, stdout, stderr = self.ssh.exec_command(cmds)
+        return  stderr.readlines() if stderr.readlines() else ''
+
+
+    def checkdir(self):
+        if self.run(self.cmd_mkdir):
+            Logger.error("mkdir error")
         else:
             self.backup()
 
     def backup(self):
-        stdin, stdout, stderr = self.ssh.exec_command(self.cmd)
-        e = stderr.readlines()
+        e = self.run(self.cmd_backup)
         if 'error' in e:
             Logger.error('Exec Commend by SSH Occer Error as:  %s' % e)
             E_MESSAGE_F = 'Backup Leanote mongoDB Faild as Following: %s' % e
             ReportBackupStatus(EMAIL_ADDR, E_SUBJECT_F, E_MESSAGE_F)
         else:
-            try:
-                self.ssh.exec_command(self.cmd_tar)
-            except Exception:
-                pass
-            else:
-                DownloadBackFile(self.conf, self.backup_file_name)
+            Logger.info("db backup to %s success", self.conf.dest)
+            self.makearchive()
 
+    def makearchive(self):
+        if self.run(self.cmd_tar):
+            Logger.error("exec cmd %s error" % self.cmd_tar)
+        else:
+            Logger.info("make archive success")
+            DownloadBackFile(self.conf, self.backup_file)
 
 class DownloadBackFile(GetSSHClient):
-    def __init__(self, conf, backup_file_name):
+    def __init__(self, conf, backup_file):
         super(DownloadBackFile, self).__init__(conf)
         self.conf = conf
-        self.backup_file_name = backup_file_name
+        self.backup_file = backup_file
         self.transfile()
 
     def transfile(self):
@@ -128,7 +130,7 @@ class DownloadBackFile(GetSSHClient):
             trans = paramiko.Transport(self.conf.host)
             trans.connect(username=self.conf.username, password=self.conf.password)
             sftp_ins = paramiko.SFTPClient.from_transport(trans)
-            sftp_ins.get(self.backup_file_name, self.backup_file_name)
+            sftp_ins.get(self.backup_file, self.backup_file)
         except Exception as e:
             Logger.error('Download Error as %s' % e)
             E_MESSAGE_F = 'Download Error as %s' % e
@@ -141,7 +143,7 @@ class ReportBackupStatus(object):
     def __init__(self, reciver, mail_subject, message):
         self.smtp_server_addr = "smtp.126.com"
         self.smtp_server_port = 465
-        self.smtp_server_passwd = 'XXXX'
+        self.smtp_server_passwd = 'xxxx'
 
         self.sender = 'neteric@126.com'
         self.sender_mail_postfix = '126.com'
@@ -188,7 +190,9 @@ def main():
     if not os.path.exists(config.dest):
         os.mkdirs(config.dest)
 
-    GetSSHClient(config).work()
+    ssh = GetSSHClient(config).work()
+    ExecCmdOnServer(config, ssh).checkdir()
+
 
 
 if __name__ == "__main__":
