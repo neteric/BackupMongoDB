@@ -84,6 +84,7 @@ class ExecCmdOnServer(GetSSHClient):
         self.backup_file_name = "%s/mongo_backup_%s.tar.gz" % (
         self.conf.dest, datetime.datetime.now().strftime(DATETIME_FMT2),)
         self.cmd_tar = 'tar -zcvf %s %s' % (self.backup_file_name, self.conf.dest)
+        # TODO(ZHANGCHAO): there has a bug, mo
         self.cmd = "{0} {1} {2} {3} {4}".format('/opt/mongodb-linux-x86_64-3.0.1/bin/mongodump',
                                                 '-u %s' % self.conf.mongo_uname,
                                                 '-p %s' % self.conf.mongo_passwd,
