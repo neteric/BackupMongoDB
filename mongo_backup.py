@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Time    : 18/1/6 10:36
+# Author  : Eric.Zhang
+
 import paramiko
 import logging
 import logging.config
@@ -48,8 +53,6 @@ LOG_CONFIG_DICT = {
 Logger = logging.getLogger('LeMongoDump')
 
 
-
-
 class GetSSHClient(object):
     def __init__(self, conf):
         self.conf = conf
@@ -83,17 +86,16 @@ class ExecCmdOnServer(GetSSHClient):
         self.backup_file = "%s/mongo_backup_%s.tar.gz" % (self.conf.dest, NOW)
         self.cmd_tar = 'tar -zcvf %s %s' % (self.backup_file, self.DEST)
         self.cmd_backup = "{0} {1} {2} {3} {4}".format('/opt/mongodb-linux-x86_64-3.0.1/bin/mongodump',
-                                                '-u %s' % self.conf.mongo_uname,
-                                                '-p %s' % self.conf.mongo_passwd,
-                                                '-d %s' % self.conf.mongo_dbname,
-                                                '-o %s' % self.DEST
-                                                )
+                                                       '-u %s' % self.conf.mongo_uname,
+                                                       '-p %s' % self.conf.mongo_passwd,
+                                                       '-d %s' % self.conf.mongo_dbname,
+                                                       '-o %s' % self.DEST
+                                                       )
 
     def run(self, cmds):
         Logger.info("Runing cmd: %s" % cmds)
         stdin, stdout, stderr = self.ssh.exec_command(cmds)
-        return  stderr.readlines() if stderr.readlines() else ''
-
+        return stderr.readlines() if stderr.readlines() else ''
 
     def checkdir(self):
         if self.run(self.cmd_mkdir):
@@ -117,6 +119,7 @@ class ExecCmdOnServer(GetSSHClient):
         else:
             Logger.info("make archive success")
             DownloadBackFile(self.conf, self.backup_file)
+
 
 class DownloadBackFile(GetSSHClient):
     def __init__(self, conf, backup_file):
@@ -144,14 +147,11 @@ class ReportBackupStatus(object):
         self.smtp_server_addr = "smtp.126.com"
         self.smtp_server_port = 465
         self.smtp_server_passwd = 'xxxx'
-
         self.sender = 'neteric@126.com'
         self.sender_mail_postfix = '126.com'
-
         self.sender_alias = "Leanote server"
         self.reciver = reciver
         self.reciver_alias = "boys"
-
         self.message = message
         self.mail_subject = mail_subject
         self.mail()
@@ -192,7 +192,6 @@ def main():
 
     ssh = GetSSHClient(config).work()
     ExecCmdOnServer(config, ssh).checkdir()
-
 
 
 if __name__ == "__main__":
